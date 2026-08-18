@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Every release carries the source archives GitHub generates plus a built wheel
 and sdist, so `pip install` works straight from the downloaded file.
 
+## [Unreleased]
+
+Nothing yet.
+
 ## [1.0.0] - 2026-08-18
 
 First public release.
@@ -43,4 +47,5 @@ First public release.
 - Structural TIFF tags are never removed.
 - Overwriting an original requires an explicit confirmation and writes a backup.
 
+[Unreleased]: https://github.com/mikecastrodemaria/ImgMetaManager/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.0.0

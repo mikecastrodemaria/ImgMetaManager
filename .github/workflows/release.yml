@@ -111,7 +111,8 @@ jobs:
 
           version = os.environ["VERSION"]
           text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
-          pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |\Z)"
+          # Stop at the next version heading or at the link definitions.
+          pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |^\[[^\]]+\]:|\Z)"
           match = re.search(pattern, text, re.S | re.M)
           notes = match.group(1).strip() if match else f"Release {version}."
           pathlib.Path("release-notes.md").write_text(notes + "\n", encoding="utf-8")
@@ -124,12 +125,10 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            git tag -a "${TAG}" -m "ImgMetaManager ${VERSION}"
-            git push origin "refs/tags/${TAG}"
-          fi
+          # gh creates the tag on the target commit, so the runner needs no git
+          # identity and no extra push.
           gh release create "${TAG}" \
+            --target "${GITHUB_SHA}" \
             --title "ImgMetaManager ${VERSION}" \
             --notes-file release-notes.md \
-            --verify-tag \
             dist/*
