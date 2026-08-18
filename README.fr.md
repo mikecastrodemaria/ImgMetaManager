@@ -240,9 +240,11 @@ d'intégration continue rejoue les tests sur Ubuntu, Windows et macOS, en Python
 ### Publier une version
 
 Changez `version` dans `pyproject.toml`, ajoutez la section correspondante au
-`CHANGELOG.md`, puis poussez un tag `v1.2.3` ou lancez le workflow **Release**
-depuis l'onglet Actions. Il rejoue les tests, construit le wheel et le sdist, et
-publie une release GitHub dont les notes viennent du changelog.
+`CHANGELOG.md`, puis poussez sur la branche par défaut. Le workflow **Release**
+pose le tag, rejoue les tests, construit le wheel et le sdist, et publie une
+release GitHub dont les notes viennent du changelog. Pousser un tag `v1.2.3` ou
+lancer le workflow à la main fait la même chose, et une version déjà publiée est
+laissée telle quelle.
 
 ### Organisation
 

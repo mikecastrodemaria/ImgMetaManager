@@ -1,22 +1,34 @@
 name: Release
 
-# Two ways in: push a v1.2.3 tag, or run this workflow by hand from the Actions
-# tab and give it the version number. Both paths run the test suite, build the
-# distributions and publish a GitHub release whose notes come from CHANGELOG.md.
+# Releases follow the version declared in pyproject.toml. Bump it, write the
+# matching CHANGELOG.md section, push to the default branch, and this workflow
+# tags the commit and publishes the release. It is idempotent: a push that does
+# not change the version finds the release already there and stops.
+#
+# Pushing a v1.2.3 tag, or running the workflow by hand from the Actions tab,
+# does the same thing.
 on:
   push:
+    paths:
+      - "pyproject.toml"
+      - "CHANGELOG.md"
     tags: ["v*.*.*"]
   workflow_dispatch:
     inputs:
       version:
         description: "Version to release, without the leading v (for example 1.0.0)"
-        required: true
+        required: false
 
 permissions:
   contents: write
 
 jobs:
   release:
+    # Only the default branch and explicit tags may publish.
+    if: >-
+      github.ref_type == 'tag'
+      || github.event_name == 'workflow_dispatch'
+      || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,13 +47,30 @@ jobs:
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             version="${GITHUB_REF_NAME#v}"
-          else
+          elif [ -n "${INPUT_VERSION}" ]; then
             version="${INPUT_VERSION}"
+          else
+            version="$(python -c "import pathlib,tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")"
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "Releasing version ${version}"
+
+      - name: Stop if the release already exists
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} is already published, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check the version against pyproject.toml
+        if: steps.guard.outputs.skip == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -59,6 +88,7 @@ jobs:
           PY
 
       - name: Install and test
+        if: steps.guard.outputs.skip == 'false'
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
@@ -67,11 +97,13 @@ jobs:
           python -m pytest tests -q
 
       - name: Build the distributions
+        if: steps.guard.outputs.skip == 'false'
         run: |
           python -m pip install build
           python -m build
 
       - name: Extract the changelog section
+        if: steps.guard.outputs.skip == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -89,6 +121,7 @@ jobs:
           PY
 
       - name: Publish the release
+        if: steps.guard.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}

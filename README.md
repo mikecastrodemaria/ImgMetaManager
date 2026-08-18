@@ -231,9 +231,11 @@ Python 3.10 and 3.12.
 ### Releasing
 
 Bump `version` in `pyproject.toml`, add the matching section to `CHANGELOG.md`,
-then either push a `v1.2.3` tag or run the **Release** workflow from the Actions
-tab. It re-runs the tests, builds the wheel and the sdist, and publishes a
-GitHub release whose notes come from the changelog.
+then push to the default branch. The **Release** workflow tags the commit,
+re-runs the tests, builds the wheel and the sdist, and publishes a GitHub
+release whose notes come from the changelog. Pushing a `v1.2.3` tag or running
+the workflow by hand does the same thing, and a version already published is
+left alone.
 
 ### Layout
 
