@@ -11,6 +11,32 @@ and sdist, so `pip install` works straight from the downloaded file.
 
 Nothing yet.
 
+## [1.1.0] - 2026-08-18
+
+### Added
+
+- **AI provenance detection**, read-only, in the context of article 50 of the
+  EU AI Act. Three independent detectors, each behind an optional dependency
+  that degrades away cleanly when it is missing:
+  - **C2PA / Content Credentials** manifests (`pip install c2pa-python`):
+    producing tool, signing certificate, signing time and validation state. A
+    file with no manifest is the ordinary case, not an error.
+  - **Invisible TrustMark watermark** (`pip install trustmark`), decoded only on
+    demand from a button or the `--watermark` flag, since the first call
+    downloads a 40 MB model. Never runs while browsing.
+  - **Declarative metadata**: generator parameters and the IPTC
+    `DigitalSourceType` field, labelled as unsigned. A source type found inside
+    a signed C2PA manifest is credited to the manifest instead.
+- Provenance section in the preview tab, `--provenance` on the `show` and
+  `export` sub-commands, and a `provenance` block in the JSON exports.
+- `provenance`, `c2pa` and `watermark` installation extras.
+
+### Wording
+
+The absence of a mark is never presented as evidence. No output describes an
+image as authentic, genuine or not AI-generated. Three outcomes exist: signals
+found, signals found but invalid, and no signal, which is inconclusive.
+
 ## [1.0.1] - 2026-08-18
 
 ### Fixed
@@ -58,6 +84,7 @@ First public release.
 - Structural TIFF tags are never removed.
 - Overwriting an original requires an explicit confirmation and writes a backup.
 
-[Unreleased]: https://github.com/mikecastrodemaria/ImgMetaManager/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/mikecastrodemaria/ImgMetaManager/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.1.0
 [1.0.1]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.0.1
 [1.0.0]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.0.0

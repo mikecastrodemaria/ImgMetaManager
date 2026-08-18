@@ -6,3 +6,11 @@ defusedxml>=0.7.1
 
 # Optional: read HEIC/HEIF and AVIF files (iPhone photos)
 # pip install pillow-heif
+
+# Optional: AI provenance detection (EU AI Act article 50)
+#   C2PA / Content Credentials manifests:
+# pip install c2pa-python
+#   Invisible TrustMark watermark, pulls torch:
+# pip install trustmark
+#   On Windows, the trustmark source package needs UTF-8 to build:
+# set PYTHONUTF8=1 && pip install trustmark

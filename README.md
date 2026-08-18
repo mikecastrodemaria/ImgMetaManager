@@ -163,6 +163,70 @@ Three safety rules:
 
 ---
 
+## AI provenance
+
+Article 50 of the EU AI Act asks providers to mark generated content and
+deployers to disclose it. This tab reads the marks that carry that information.
+It only reads: the image is never modified.
+
+### The three signals
+
+| Signal | What it is | Weight |
+| --- | --- | --- |
+| **C2PA / Content Credentials** | A manifest embedded in the file, signed by a certificate, naming the producing tool and the signing time | Cryptographic. Tampering with the pixels invalidates it |
+| **TrustMark watermark** | An invisible pattern in the pixels themselves, surviving resize and re-encode | Strong, but the payload is only about nine characters |
+| **Declarative metadata** | Generator parameters (AUTOMATIC1111, ComfyUI) and the IPTC `DigitalSourceType` field written by Google and Meta | Plain text. Anyone can write it, anyone can erase it |
+
+The first two need an optional dependency. Without it the corresponding check is
+skipped and the interface says so.
+
+```bash
+pip install "imgmetamanager[provenance]"     # both
+pip install "imgmetamanager[c2pa]"           # C2PA only, small
+pip install "imgmetamanager[watermark]"      # TrustMark only, pulls torch
+```
+
+On Windows, the TrustMark source package fails to build under the ANSI code
+page. Install it with UTF-8 forced:
+
+```powershell
+set PYTHONUTF8=1 && pip install trustmark
+```
+
+### How to read the result
+
+There are three outcomes, and none of them clears an image:
+
+- **Signals found.** The details name what was found and where it came from.
+- **Signals found but invalid.** A manifest exists and does not validate: the
+  file was altered after it was signed.
+- **No signal.** Inconclusive, and nothing more than that.
+
+**An absent signal proves nothing.** A screenshot, a re-encode, a crop or a
+metadata cleaner strips every one of these marks, and the overwhelming majority
+of AI images never carried one to begin with. ImgMetaManager therefore never
+describes an image as authentic, genuine, or not AI-generated, in the interface,
+in the exports or in this documentation. Read a found signal as evidence about
+the file's history, and read its absence as the absence of evidence.
+
+The watermark check is the only one that costs anything: it downloads a 40 MB
+model on first use and takes about a second per image, so it runs only when you
+press the button or pass `--watermark`. It never runs while browsing.
+
+### From the command line
+
+```bash
+imgmetamanager show photo.jpg --provenance              # C2PA and declarative
+imgmetamanager show photo.jpg --provenance --watermark  # adds TrustMark
+imgmetamanager export ~/Photos -r --provenance -f json -o report.json
+```
+
+The terminal output stays inside the Windows ANSI code page, so a redirected
+console never breaks on it. JSON exports carry a `provenance` block per image,
+including the disclaimer.
+
+---
+
 ## Command line
 
 The web interface is the default. Three sub-commands work without a browser.
@@ -224,7 +288,7 @@ python -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pip install -e .
 
-.venv/bin/python -m pytest tests -q     # 88 tests
+.venv/bin/python -m pytest tests -q     # 115 tests
 .venv/bin/python -m pyflakes imgmetamanager tests
 ```
 
@@ -251,6 +315,7 @@ imgmetamanager/
     ├── containers.py byte-level JPEG, PNG and WebP readers and writers
     ├── reader.py     metadata extraction
     ├── writer.py     removal, with a Pillow fallback
+    ├── provenance.py C2PA, TrustMark and declarative AI signals
     ├── exporter.py   JSON, CSV, TXT, Markdown, HTML, ZIP
     ├── tags.py       tag tables, enumerations, value formatting
     ├── model.py      ImageMeta and MetaItem
@@ -283,6 +348,8 @@ export_metadata([meta], "json", "meta.json")
 | piexif | selective EXIF block rewriting |
 | defusedxml | hardened XMP parsing |
 | pillow-heif | optional, HEIC/HEIF/AVIF support |
+| c2pa-python | optional, reads C2PA manifests |
+| trustmark | optional, decodes the invisible watermark |
 
 ## Licence
 

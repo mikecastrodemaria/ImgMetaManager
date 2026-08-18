@@ -22,6 +22,10 @@ from .core.exporter import (
     metadata_to_string, rows_to_text,
 )
 from .core.model import ImageMeta
+from .core.provenance import (
+    VERDICT_INVALID, VERDICT_SIGNALS, detect as detect_provenance,
+    missing_dependencies, trustmark_available,
+)
 from .core.reader import SUPPORTED_READ, make_preview, read_metadata
 from .core.tags import GROUP_ICC, GROUP_ORDER, REMOVABLE_KINDS
 from .core.utils import human_size, is_image_file, safe_name, scan_folder
@@ -224,6 +228,38 @@ def _summary(entry: Optional[Entry]) -> str:
     return "\n".join(lines)
 
 
+#: Neutral markers. No check mark: a found signal is information, not a verdict
+#: of authenticity, and an absent one is not a verdict either.
+_VERDICT_ICONS = {VERDICT_SIGNALS: "🔎", VERDICT_INVALID: "⚠️"}
+
+
+def _provenance_markdown(entry: Optional["Entry"], check_watermark: bool = False) -> str:
+    """Render the AI provenance block for the viewer."""
+    if entry is None or not entry.meta.ok:
+        return f"*{t('msg_no_image')}*"
+    result = detect_provenance(entry.path, check_watermark=check_watermark,
+                               meta=entry.meta)
+    icon = _VERDICT_ICONS.get(result.verdict, "")
+    lines = [f"{icon} **{result.verdict_label}**".strip(), ""]
+    details = result.details()
+    if details:
+        lines.append("| | |")
+        lines.append("| --- | --- |")
+        lines.extend(f"| {label} | {value} |" for label, value in details)
+        lines.append("")
+    if not result.checked_watermark:
+        lines.append(f"*{t('prov_not_checked')}*")
+        lines.append("")
+    for problem in result.errors:
+        lines.append(f"> {problem}")
+    missing = missing_dependencies()
+    if missing:
+        lines.append(f"*{t('prov_install_hint', packages=', '.join(missing))}*")
+        lines.append("")
+    lines.append(f"<small>{t('prov_disclaimer')}</small>")
+    return "\n".join(lines)
+
+
 def _status(message: str, level: str = "info") -> str:
     """Prefix a status message with an icon matching its severity."""
     icons = {"info": "ℹ️", "ok": "✅", "warn": "⚠️", "error": "⛔"}
@@ -281,6 +317,7 @@ class MetaApp:
             gr.update(choices=_group_choices(meta) if meta else [], value=groups),
             gr.update(value=rows),
             gr.update(choices=_kind_choices(meta), value=default_kinds),
+            _provenance_markdown(entry),
         )
 
     def render_table(self, entries: List[Entry], index: int, groups: List[str],
@@ -336,6 +373,19 @@ class MetaApp:
     def pick(self, evt: gr.SelectData, entries: List[Entry]):
         """Handle a click in the gallery and return the new selection index."""
         return _clamp(evt.index if isinstance(evt.index, int) else 0, entries or [])
+
+    # ------------------------------------------------------------- provenance
+    def render_provenance(self, entries: List[Entry], index: int,
+                          check_watermark: bool = False):
+        """Render the provenance block for the selected image."""
+        return gr.update(value=_provenance_markdown(_current(entries, index),
+                                                    check_watermark))
+
+    def check_watermark(self, entries: List[Entry], index: int):
+        """Run the watermark decoder on demand, from the button."""
+        if not trustmark_available():
+            return gr.update(value=f"*{t('prov_needs', package='trustmark')}*")
+        return self.render_provenance(entries, index, check_watermark=True)
 
     # ---------------------------------------------------------------- clipboard
     def add_row(self, evt: gr.SelectData, entries: List[Entry], index: int, groups: List[str],
@@ -564,6 +614,13 @@ def build_interface(allow_local: bool = True,
                                 **gc.supported(gr.Image, buttons=["fullscreen", "download"]),
                             )
                             summary_md = gr.Markdown(_summary(None))
+                        with gr.Accordion(t("prov_section"), open=True):
+                            provenance_md = gr.Markdown(_provenance_markdown(None))
+                            with gr.Row():
+                                watermark_btn = gr.Button(
+                                    t("prov_check_watermark"), size="sm", scale=1,
+                                    interactive=trustmark_available())
+                                gr.Markdown(f"*{t('prov_watermark_hint')}*", scale=3)
                         with gr.Row():
                             group_filter = gr.CheckboxGroup(label=t("filter_groups"), choices=[],
                                                             value=[], scale=3)
@@ -639,7 +696,8 @@ def build_interface(allow_local: bool = True,
                         gr.Markdown(help_markdown(app.allow_local))
 
         # ---------------------------------------------------------------- events
-        view_outputs = [preview_img, summary_md, group_filter, table, clean_kinds]
+        view_outputs = [preview_img, summary_md, group_filter, table, clean_kinds,
+                        provenance_md]
         view_inputs = [entries_state, index_state, search_in, sensitive_in]
         table_inputs = [entries_state, index_state, group_filter, search_in, sensitive_in]
 
@@ -664,6 +722,9 @@ def build_interface(allow_local: bool = True,
         for control in (group_filter, sensitive_in):
             control.change(app.render_table, table_inputs, table)
         search_in.change(app.render_table, table_inputs, table)
+
+        watermark_btn.click(app.check_watermark, [entries_state, index_state],
+                            provenance_md)
 
         table.select(app.add_row,
                      [entries_state, index_state, group_filter, search_in, sensitive_in,

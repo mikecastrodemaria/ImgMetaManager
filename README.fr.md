@@ -168,6 +168,73 @@ Trois règles de sûreté :
 
 ---
 
+## Provenance IA
+
+L'article 50 du règlement européen sur l'IA demande aux fournisseurs de marquer
+les contenus générés et aux déployeurs de les signaler. Cet onglet lit les
+marques qui portent cette information. Il ne fait que lire : l'image n'est jamais
+modifiée.
+
+### Les trois signaux
+
+| Signal | Ce que c'est | Poids |
+| --- | --- | --- |
+| **C2PA / Content Credentials** | Un manifeste inscrit dans le fichier, signé par un certificat, qui nomme l'outil producteur et la date de signature | Cryptographique. Modifier les pixels l'invalide |
+| **Filigrane TrustMark** | Un motif invisible dans les pixels eux-mêmes, qui survit au redimensionnement et au réencodage | Solide, mais la charge utile fait environ neuf caractères |
+| **Métadonnées déclaratives** | Paramètres de génération (AUTOMATIC1111, ComfyUI) et champ IPTC `DigitalSourceType` écrit par Google et Meta | Du texte simple. N'importe qui peut l'écrire, n'importe qui peut l'effacer |
+
+Les deux premiers demandent une dépendance optionnelle. Sans elle, la
+vérification correspondante est ignorée et l'interface l'indique.
+
+```bash
+pip install "imgmetamanager[provenance]"     # les deux
+pip install "imgmetamanager[c2pa]"           # C2PA seul, léger
+pip install "imgmetamanager[watermark]"      # TrustMark seul, tire torch
+```
+
+Sous Windows, le paquet source de TrustMark échoue à se construire avec la page
+de code ANSI. Installez-le en forçant l'UTF-8 :
+
+```powershell
+set PYTHONUTF8=1 && pip install trustmark
+```
+
+### Comment lire le résultat
+
+Trois résultats sont possibles, et aucun ne blanchit une image :
+
+- **Signaux trouvés.** Le détail nomme ce qui a été trouvé et d'où ça vient.
+- **Signaux trouvés mais invalides.** Un manifeste existe et ne se valide pas :
+  le fichier a été modifié après sa signature.
+- **Aucun signal.** Non concluant, et rien de plus.
+
+**Une absence de signal ne prouve rien.** Une capture d'écran, un réencodage, un
+recadrage ou un nettoyage de métadonnées efface toutes ces marques, et l'immense
+majorité des images générées n'en ont jamais porté. ImgMetaManager ne qualifie
+donc jamais une image d'authentique, de véridique ou de non générée, ni dans
+l'interface, ni dans les exports, ni dans cette documentation. Lisez un signal
+trouvé comme une information sur l'histoire du fichier, et son absence comme une
+absence d'information.
+
+La vérification du filigrane est la seule qui coûte quelque chose : elle
+télécharge un modèle de 40 Mo au premier usage et prend environ une seconde par
+image, donc elle ne s'exécute qu'au clic sur le bouton ou avec `--watermark`.
+Jamais pendant la navigation.
+
+### En ligne de commande
+
+```bash
+imgmetamanager show photo.jpg --provenance              # C2PA et déclaratif
+imgmetamanager show photo.jpg --provenance --watermark  # ajoute TrustMark
+imgmetamanager export ~/Photos -r --provenance -f json -o rapport.json
+```
+
+La sortie terminal reste dans la page de code ANSI de Windows, donc une console
+redirigée ne casse jamais dessus. Les exports JSON portent un bloc `provenance`
+par image, avec la mise en garde.
+
+---
+
 ## Ligne de commande
 
 L'interface web est le mode par défaut. Trois sous-commandes travaillent sans
@@ -232,7 +299,7 @@ python -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pip install -e .
 
-.venv/bin/python -m pytest tests -q     # 88 tests
+.venv/bin/python -m pytest tests -q     # 115 tests
 .venv/bin/python -m pyflakes imgmetamanager tests
 ```
 
@@ -261,6 +328,7 @@ imgmetamanager/
     ├── containers.py lecture et réécriture des conteneurs JPEG, PNG, WebP
     ├── reader.py     extraction des métadonnées
     ├── writer.py     suppression, avec repli sur Pillow
+    ├── provenance.py signaux IA C2PA, TrustMark et déclaratifs
     ├── exporter.py   JSON, CSV, TXT, Markdown, HTML, ZIP
     ├── tags.py       tables de tags, énumérations, formatage des valeurs
     ├── model.py      ImageMeta et MetaItem
@@ -294,6 +362,8 @@ export_metadata([meta], "json", "meta.json")
 | piexif | réécriture sélective des blocs EXIF |
 | defusedxml | analyse durcie des paquets XMP |
 | pillow-heif | optionnel, lecture HEIC/HEIF/AVIF |
+| c2pa-python | optionnel, lecture des manifestes C2PA |
+| trustmark | optionnel, décodage du filigrane invisible |
 
 ## Licence
 

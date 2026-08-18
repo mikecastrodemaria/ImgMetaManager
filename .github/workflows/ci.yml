@@ -38,3 +38,35 @@ jobs:
         run: |
           imgmetamanager --version
           python -m imgmetamanager --help
+
+  provenance:
+    name: Provenance extras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # The matrix above runs without these, which exercises the skip-if-missing
+      # path. This job installs them so the detectors are actually tested.
+      - name: Install with the provenance extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e ".[provenance]"
+
+      - name: Tests
+        run: python -m pytest tests -q
+
+      - name: Confirm the detectors were available
+        run: |
+          python - <<'PY'
+          from imgmetamanager.core import provenance
+
+          assert provenance.c2pa_available(), "c2pa-python did not import"
+          assert provenance.trustmark_available(), "trustmark did not import"
+          print("both detectors available")
+          PY

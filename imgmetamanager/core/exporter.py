@@ -15,7 +15,7 @@ import zipfile
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..i18n import colon, current_language, t
 from .model import ImageMeta, MetaItem
@@ -52,7 +52,8 @@ def _filter(meta: ImageMeta, groups: Optional[Iterable[str]], query: str,
 
 
 # ------------------------------------------------------------------- renderers
-def _to_json(metas: Sequence[ImageMeta], selected: Dict[str, List[MetaItem]]) -> str:
+def _to_json(metas: Sequence[ImageMeta], selected: Dict[str, List[MetaItem]],
+             provenance: Optional[Dict[str, Any]] = None) -> str:
     """Render a machine-readable document; repeated tags collapse into lists."""
     payload = {
         "generator": "ImgMetaManager",
@@ -87,6 +88,9 @@ def _to_json(metas: Sequence[ImageMeta], selected: Dict[str, List[MetaItem]]) ->
             entry["warnings"] = meta.warnings
         if not meta.ok:
             entry["error"] = meta.error
+        found = (provenance or {}).get(meta.path)
+        if found is not None:
+            entry["provenance"] = found.to_dict()
         payload["images"].append(entry)
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
@@ -232,6 +236,7 @@ def metadata_to_string(
     sensitive_only: bool = False,
     group_labels: Optional[Dict[str, str]] = None,
     csv_delimiter: str = ",",
+    provenance: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Serialise one or more analyses into the requested format.
 
@@ -243,6 +248,8 @@ def metadata_to_string(
         sensitive_only: Keep only potentially identifying entries.
         group_labels: Group key mapped to its display label, for the human formats.
         csv_delimiter: Field separator for CSV; use ``";"`` for French Excel.
+        provenance: AI provenance results keyed by image path. Included in the
+            JSON output only, which is the format meant to be parsed.
 
     Raises:
         ValueError: if ``fmt`` is not a known format.
@@ -252,7 +259,7 @@ def metadata_to_string(
         raise ValueError(f"Unknown export format: {fmt}")
     selected = {meta.path: _filter(meta, groups, query, sensitive_only) for meta in metas}
     if key == "json":
-        return _to_json(metas, selected)
+        return _to_json(metas, selected, provenance)
     if key == "csv":
         return _to_csv(metas, selected, csv_delimiter)
     if key == "txt":
@@ -272,6 +279,7 @@ def export_metadata(
     sensitive_only: bool = False,
     group_labels: Optional[Dict[str, str]] = None,
     csv_delimiter: str = ",",
+    provenance: Optional[Dict[str, Any]] = None,
 ) -> Path:
     """Write the export to a file and return its path.
 
@@ -280,7 +288,7 @@ def export_metadata(
     """
     text = metadata_to_string(metas, fmt, groups=groups, query=query,
                               sensitive_only=sensitive_only, group_labels=group_labels,
-                              csv_delimiter=csv_delimiter)
+                              csv_delimiter=csv_delimiter, provenance=provenance)
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)
     encoding = "utf-8-sig" if fmt.lower() == "csv" else "utf-8"

@@ -151,6 +151,36 @@ EN: Dict[str, str] = {
                         "Free one up, or pass --port with a port of your own.",
     "cli_port_auto": "Port {default} is busy, listening on {port} instead.",
     "cli_launch_failed": "The server could not start: {error}",
+    # AI provenance. Wording rule: a missing signal is never evidence of
+    # anything, so no string here may call an image authentic or human-made.
+    "prov_section": "AI provenance",
+    "prov_verdict_signals": "Provenance signals found.",
+    "prov_verdict_invalid": "Provenance signals found, but they do not validate: "
+                            "the file was altered after it was signed.",
+    "prov_verdict_none": "No provenance signal found. This is inconclusive, "
+                         "not evidence either way.",
+    "prov_disclaimer": "A missing signal proves nothing: signatures and watermarks "
+                       "are stripped by a screenshot, a re-encode or a metadata "
+                       "cleaner, and most AI images never carried one.",
+    "prov_c2pa_generator": "C2PA producer",
+    "prov_c2pa_issuer": "Signed by",
+    "prov_c2pa_signed_at": "Signed at",
+    "prov_c2pa_source_type": "Declared source (signed)",
+    "prov_c2pa_state": "Signature state",
+    "prov_c2pa_error": "C2PA manifest unreadable: {error}",
+    "prov_watermark": "Invisible watermark",
+    "prov_watermark_found": "TrustMark payload found: {payload}",
+    "prov_watermark_absent": "no TrustMark payload decoded",
+    "prov_watermark_error": "Watermark decoder failed: {error}",
+    "prov_declared": "Declared, unsigned",
+    "prov_declared_generator": "generator metadata: {name}",
+    "prov_declared_source_type": "IPTC DigitalSourceType: {value}",
+    "prov_needs": "Install {package} to run this check.",
+    "prov_check_watermark": "Check invisible watermark",
+    "prov_watermark_hint": "Downloads a 40 MB model on first use, then takes about "
+                           "a second per image. Runs only when you ask.",
+    "prov_install_hint": "Install {packages} to widen the detection.",
+    "prov_not_checked": "Invisible watermark not checked.",
 }
 
 FR: Dict[str, str] = {
@@ -281,6 +311,36 @@ FR: Dict[str, str] = {
                         "Libérez-en un, ou indiquez le vôtre avec --port.",
     "cli_port_auto": "Le port {default} est occupé, écoute sur le port {port}.",
     "cli_launch_failed": "Le serveur n'a pas pu démarrer : {error}",
+    "prov_section": "Provenance IA",
+    "prov_verdict_signals": "Signaux de provenance trouvés.",
+    "prov_verdict_invalid": "Signaux de provenance trouvés, mais ils ne se valident "
+                            "pas : le fichier a été modifié après sa signature.",
+    "prov_verdict_none": "Aucun signal de provenance trouvé. Ce résultat n'est pas "
+                         "concluant, ni dans un sens ni dans l'autre.",
+    "prov_disclaimer": "Une absence de signal ne prouve rien : une capture d'écran, "
+                       "un réencodage ou un nettoyage de métadonnées effacent "
+                       "signatures et filigranes, et la plupart des images générées "
+                       "n'en ont jamais porté.",
+    "prov_c2pa_generator": "Producteur C2PA",
+    "prov_c2pa_issuer": "Signé par",
+    "prov_c2pa_signed_at": "Signé le",
+    "prov_c2pa_source_type": "Source déclarée (signée)",
+    "prov_c2pa_state": "État de la signature",
+    "prov_c2pa_error": "Manifeste C2PA illisible : {error}",
+    "prov_watermark": "Filigrane invisible",
+    "prov_watermark_found": "charge utile TrustMark trouvée : {payload}",
+    "prov_watermark_absent": "aucune charge utile TrustMark décodée",
+    "prov_watermark_error": "Le décodeur de filigrane a échoué : {error}",
+    "prov_declared": "Déclaratif, non signé",
+    "prov_declared_generator": "métadonnées de génération : {name}",
+    "prov_declared_source_type": "IPTC DigitalSourceType : {value}",
+    "prov_needs": "Installez {package} pour effectuer cette vérification.",
+    "prov_check_watermark": "Vérifier le filigrane invisible",
+    "prov_watermark_hint": "Télécharge un modèle de 40 Mo au premier usage, puis "
+                           "prend environ une seconde par image. Ne s'exécute que "
+                           "sur demande.",
+    "prov_install_hint": "Installez {packages} pour élargir la détection.",
+    "prov_not_checked": "Filigrane invisible non vérifié.",
 }
 
 #: Group labels, keyed by ``group_<key>``.
@@ -422,6 +482,27 @@ Entries marked ⚠ (GPS, serial numbers, author names, MakerNote, places) are th
 ones that identify a person, a place or a device. The "Sensitive data only"
 filter isolates them in one click.
 
+### AI provenance
+
+Three independent signals are looked for, in the context of article 50 of the
+EU AI Act:
+
+1. A **C2PA manifest**, cryptographically signed, naming the tool that produced
+   the file and the certificate that signed it.
+2. An **invisible TrustMark watermark** carried by the pixels, which survives
+   resizing and re-encoding. It loads a model, so it runs only when you press
+   the button.
+3. **Declarative metadata**: generator parameters and the IPTC
+   `DigitalSourceType` field. Plain text, which anyone can write or erase.
+
+**Read the result carefully.** A found signal tells you something about the
+file's history. An absent signal tells you nothing at all: a screenshot, a
+re-encode or a metadata cleaner removes every one of them, and most AI images
+never carried any. This application therefore never labels an image as
+authentic, and never states that an image is not AI-generated. The three
+possible outcomes are: signals found, signals found but invalid, and no signal,
+which is inconclusive.
+
 ### Readable formats
 
 {formats}
@@ -464,6 +545,27 @@ sont stockés dans le même bloc.
 Les entrées marquées ⚠ (GPS, numéros de série, noms d'auteur, MakerNote, lieux)
 sont celles qui permettent d'identifier une personne, un lieu ou un appareil.
 Le filtre « Uniquement les données sensibles » les isole en un clic.
+
+### Provenance IA
+
+Trois signaux indépendants sont recherchés, dans le cadre de l'article 50 du
+règlement européen sur l'IA :
+
+1. Un **manifeste C2PA**, signé cryptographiquement, qui nomme l'outil ayant
+   produit le fichier et le certificat qui l'a signé.
+2. Un **filigrane invisible TrustMark** porté par les pixels, qui survit à un
+   redimensionnement et à un réencodage. Il charge un modèle, donc il ne
+   s'exécute qu'au clic sur le bouton.
+3. Les **métadonnées déclaratives** : paramètres de génération et champ IPTC
+   `DigitalSourceType`. Du texte simple, que n'importe qui peut écrire ou effacer.
+
+**Lisez le résultat avec précaution.** Un signal trouvé renseigne sur
+l'histoire du fichier. Un signal absent ne renseigne sur rien : une capture
+d'écran, un réencodage ou un nettoyage de métadonnées les efface tous, et la
+plupart des images générées n'en ont jamais porté. Cette application ne qualifie
+donc jamais une image d'authentique, et n'affirme jamais qu'une image n'est pas
+générée. Trois résultats sont possibles : signaux trouvés, signaux trouvés mais
+invalides, et aucun signal, ce qui n'est pas concluant.
 
 ### Formats lus
 

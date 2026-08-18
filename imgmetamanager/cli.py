@@ -17,11 +17,26 @@ from . import __version__
 from .core.exporter import EXPORT_FORMATS, metadata_to_string
 from .core.reader import read_metadata
 from .core.tags import GROUP_ORDER, REMOVABLE_KINDS
+from .core.provenance import detect as detect_provenance
 from .core.utils import human_size, scan_folder
 from .core.writer import DEFAULT_KINDS, plan_removal, strip_metadata
 from .i18n import detect_language, group_label, set_language, t
 
 DEFAULT_PORT = 7860
+
+
+def make_output_printable() -> None:
+    """Never let an unencodable character abort the output.
+
+    A Windows console redirected to a file falls back to the ANSI code page,
+    where the status icons have no representation. Replacing them beats raising
+    ``UnicodeEncodeError`` halfway through a report.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, OSError, ValueError):  # pragma: no cover
+            pass
 
 #: How many ports to try after the default one before giving up.
 PORT_SCAN_RANGE = 64
@@ -149,6 +164,16 @@ def cmd_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _collect_provenance(metas: Sequence, args: argparse.Namespace) -> Optional[dict]:
+    """Run the provenance detectors when the flags ask for them."""
+    if not (args.provenance or args.watermark):
+        return None
+    return {
+        meta.path: detect_provenance(meta.path, check_watermark=args.watermark, meta=meta)
+        for meta in metas
+    }
+
+
 def cmd_show(args: argparse.Namespace) -> int:
     """Print the metadata of the given files to standard output."""
     paths = collect_paths(args.files, args.recursive)
@@ -156,10 +181,18 @@ def cmd_show(args: argparse.Namespace) -> int:
         print(t("cli_no_input_show"), file=sys.stderr)
         return 2
     metas = [read_metadata(path, with_hash=not args.no_hash) for path in paths]
+    provenance = _collect_provenance(metas, args)
     print(metadata_to_string(
         metas, args.format, groups=args.groups or None, query=args.search or "",
-        sensitive_only=args.sensitive, group_labels=_labels(),
+        sensitive_only=args.sensitive, group_labels=_labels(), provenance=provenance,
     ))
+    if provenance and args.format != "json":
+        # JSON already carries the block; the readable formats get it appended.
+        for meta in metas:
+            print()
+            print(f"[{t('prov_section').upper()}] {meta.filename}")
+            for line in provenance[meta.path].as_lines():
+                print(line)
     return 0 if all(meta.ok for meta in metas) else 1
 
 
@@ -173,6 +206,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     text = metadata_to_string(
         metas, args.format, groups=args.groups or None, query=args.search or "",
         sensitive_only=args.sensitive, group_labels=_labels(),
+        provenance=_collect_provenance(metas, args),
     )
     destination = Path(args.output).expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -254,6 +288,15 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("-r", "--recursive", action="store_true",
                          help="walk into sub-folders")
 
+    def add_provenance(sub: argparse.ArgumentParser) -> None:
+        sub.add_argument("--provenance", action="store_true",
+                         help="look for AI provenance signals: C2PA manifest and "
+                              "declarative metadata")
+        sub.add_argument("--watermark", action="store_true",
+                         help="also decode the invisible TrustMark watermark, which "
+                              "downloads a 40 MB model on first use (implies "
+                              "--provenance)")
+
     show = subparsers.add_parser("show", help="print metadata to the terminal")
     add_common(show)
     show.add_argument("-f", "--format", choices=list(EXPORT_FORMATS), default="txt")
@@ -263,6 +306,7 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--sensitive", action="store_true",
                       help="show only the potentially identifying entries")
     show.add_argument("--no-hash", action="store_true", help="skip the SHA-256 digest")
+    add_provenance(show)
     show.set_defaults(func=cmd_show)
 
     export = subparsers.add_parser("export", help="write metadata to a file")
@@ -273,6 +317,7 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("-s", "--search", default="")
     export.add_argument("--sensitive", action="store_true")
     export.add_argument("--no-hash", action="store_true")
+    add_provenance(export)
     export.set_defaults(func=cmd_export)
 
     strip = subparsers.add_parser("strip", help="remove metadata")
@@ -300,6 +345,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     parser = build_parser()
     arguments = list(sys.argv[1:] if argv is None else argv)
+    make_output_printable()
     args = parser.parse_args(arguments)
     if not hasattr(args, "func"):
         # No sub-command: start the interface, keeping the global options.

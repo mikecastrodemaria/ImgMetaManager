@@ -71,12 +71,13 @@ def test_uploads_and_folder_coexist(app: MetaApp, photos, tmp_path: Path):
 
 def test_view_rendering(app: MetaApp, photos):
     entries = analyse(photos, "local")
-    preview, summary, groups, table, kinds = app.render_view(entries, 0, "", False)
+    preview, summary, groups, table, kinds, prov = app.render_view(entries, 0, "", False)
     assert Path(_value(preview)).exists()
     assert "a.jpg" in summary
     assert "gps" in groups["value"]
     assert any(row[1] == "Make" for row in _value(table))
     assert "exif" in kinds["value"] and "icc" not in kinds["value"]
+    assert "provenance" in prov.lower() or "provenance" in prov
 
 
 def test_table_filters(app: MetaApp, photos):
