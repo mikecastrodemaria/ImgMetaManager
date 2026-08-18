@@ -77,12 +77,19 @@ def test_language_detection(monkeypatch, value: str, expected: str):
 
 
 def test_declared_versions_agree():
-    """pyproject.toml and __init__.py must not drift apart."""
+    """pyproject.toml and __init__.py must not drift apart.
+
+    The version is read with a regex rather than a TOML parser: tomllib only
+    joined the standard library in 3.11, and the project supports 3.10.
+    """
     import pathlib
-    import tomllib
+    import re
 
     import imgmetamanager
 
     root = pathlib.Path(__file__).resolve().parent.parent
-    declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
-    assert imgmetamanager.__version__ == declared
+    text = (root / "pyproject.toml").read_text(encoding="utf-8")
+    project = text.split("[project]", 1)[1].split("\n[", 1)[0]
+    match = re.search(r'^version\s*=\s*"([^"]+)"', project, re.M)
+    assert match, "no version found in the [project] section"
+    assert imgmetamanager.__version__ == match.group(1)
