@@ -237,6 +237,13 @@ Le code, les commentaires et les docstrings sont en anglais. La chaîne
 d'intégration continue rejoue les tests sur Ubuntu, Windows et macOS, en Python
 3.10 et 3.12.
 
+### Publier une version
+
+Changez `version` dans `pyproject.toml`, ajoutez la section correspondante au
+`CHANGELOG.md`, puis poussez un tag `v1.2.3` ou lancez le workflow **Release**
+depuis l'onglet Actions. Il rejoue les tests, construit le wheel et le sdist, et
+publie une release GitHub dont les notes viennent du changelog.
+
 ### Organisation
 
 ```

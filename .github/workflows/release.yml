@@ -1,0 +1,105 @@
+name: Release
+
+# Two ways in: push a v1.2.3 tag, or run this workflow by hand from the Actions
+# tab and give it the version number. Both paths run the test suite, build the
+# distributions and publish a GitHub release whose notes come from CHANGELOG.md.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (for example 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Resolve the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check the version against pyproject.toml
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          wanted = os.environ["VERSION"]
+          declared = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          if declared != wanted:
+              raise SystemExit(
+                  f"pyproject.toml declares {declared}, the release asks for {wanted}")
+          print(f"version {wanted} confirmed")
+          PY
+
+      - name: Install and test
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+          python -m pyflakes imgmetamanager tests
+          python -m pytest tests -q
+
+      - name: Build the distributions
+        run: |
+          python -m pip install build
+          python -m build
+
+      - name: Extract the changelog section
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          version = os.environ["VERSION"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |\Z)"
+          match = re.search(pattern, text, re.S | re.M)
+          notes = match.group(1).strip() if match else f"Release {version}."
+          pathlib.Path("release-notes.md").write_text(notes + "\n", encoding="utf-8")
+          PY
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git tag -a "${TAG}" -m "ImgMetaManager ${VERSION}"
+            git push origin "refs/tags/${TAG}"
+          fi
+          gh release create "${TAG}" \
+            --title "ImgMetaManager ${VERSION}" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            dist/*
