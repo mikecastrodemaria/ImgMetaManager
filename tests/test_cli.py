@@ -95,7 +95,7 @@ def test_no_subcommand_starts_the_interface(monkeypatch):
     monkeypatch.setattr(cli, "cmd_ui", lambda args: called.setdefault("args", args) and 0)
     assert cli.main([]) == 0
     assert called["args"].host == "127.0.0.1"
-    assert called["args"].port == cli.DEFAULT_PORT
+    assert called["args"].port is None, "no port means pick a free one"
 
     called.clear()
     assert cli.main(["--lang", "en"]) == 0
@@ -109,3 +109,64 @@ def test_ui_options(monkeypatch):
     monkeypatch.setattr(cli, "cmd_ui", lambda args: seen.update(vars(args)) or 0)
     assert cli.main(["ui", "--port", "9000", "--share", "--no-browser"]) == 0
     assert seen["port"] == 9000 and seen["share"] is True and seen["no_browser"] is True
+
+
+# --------------------------------------------------------------------- ports
+def test_port_probe_detects_a_busy_port():
+    import socket
+
+    from imgmetamanager.cli import port_is_free
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as holder:
+        holder.bind(("127.0.0.1", 0))
+        holder.listen(1)
+        busy = holder.getsockname()[1]
+        assert not port_is_free("127.0.0.1", busy)
+    assert port_is_free("127.0.0.1", busy)
+
+
+def test_auto_port_skips_the_busy_default(capsys):
+    """A Gradio app already on 7860 must not stop this one from starting."""
+    import socket
+
+    from imgmetamanager.cli import DEFAULT_PORT, resolve_port
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as holder:
+        try:
+            holder.bind(("127.0.0.1", DEFAULT_PORT))
+        except OSError:
+            pytest.skip(f"port {DEFAULT_PORT} is already taken on this machine")
+        holder.listen(1)
+        port = resolve_port("127.0.0.1", None)
+    assert port is not None and port != DEFAULT_PORT
+    assert str(port) in capsys.readouterr().out
+
+
+def test_explicit_busy_port_is_reported(capsys):
+    """An explicit --port is honoured as given, so a clash is an error."""
+    import socket
+
+    from imgmetamanager.cli import resolve_port
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as holder:
+        holder.bind(("127.0.0.1", 0))
+        holder.listen(1)
+        busy = holder.getsockname()[1]
+        assert resolve_port("127.0.0.1", busy) is None
+    assert "already in use" in capsys.readouterr().err
+
+
+def test_no_free_port_at_all(capsys, monkeypatch):
+    from imgmetamanager import cli
+
+    monkeypatch.setattr(cli, "port_is_free", lambda host, port: False)
+    assert cli.resolve_port("127.0.0.1", None) is None
+    assert "No free port" in capsys.readouterr().err
+
+
+def test_ui_stops_cleanly_when_the_port_is_taken(monkeypatch, capsys):
+    from imgmetamanager import cli
+
+    monkeypatch.setattr(cli, "resolve_port", lambda host, port: None)
+    args = cli.build_parser().parse_args(["ui", "--port", "7860"])
+    assert cli.cmd_ui(args) == 1

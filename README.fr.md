@@ -210,7 +210,10 @@ fichier n'a été trouvé.
 L'application tourne sur votre machine. Aucune image ne quitte le poste, aucun
 appel réseau n'est fait pour analyser un fichier.
 
-Le serveur écoute sur `127.0.0.1` par défaut. `--share` crée un lien public
+Le serveur écoute sur `127.0.0.1:7860` par défaut. Si ce port est déjà pris, par
+une autre application Gradio comme une WebUI Stable Diffusion, le suivant libre
+est utilisé et le terminal indique lequel. Un `--port` explicite est respecté tel
+quel : un conflit est alors signalé comme une erreur plutôt que déplacé ailleurs. `--share` crée un lien public
 temporaire via Gradio et désactive alors l'accès aux dossiers locaux ainsi que le
 remplacement des originaux. Utilisez `--host 0.0.0.0` pour exposer l'application
 sur votre réseau local, en connaissance de cause.

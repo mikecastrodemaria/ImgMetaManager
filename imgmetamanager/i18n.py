@@ -145,6 +145,12 @@ EN: Dict[str, str] = {
     "cli_reencoded": "re-encoded",
     "cli_removed": "removed",
     "cli_backup": "backup",
+    "cli_port_busy": "Port {port} is already in use on {host}. "
+                     "Leave --port out to pick the next free one automatically.",
+    "cli_no_free_port": "No free port found between {start} and {end}. "
+                        "Free one up, or pass --port with a port of your own.",
+    "cli_port_auto": "Port {default} is busy, listening on {port} instead.",
+    "cli_launch_failed": "The server could not start: {error}",
 }
 
 FR: Dict[str, str] = {
@@ -269,6 +275,12 @@ FR: Dict[str, str] = {
     "cli_reencoded": "réencodé",
     "cli_removed": "supprimé",
     "cli_backup": "sauvegarde",
+    "cli_port_busy": "Le port {port} est déjà utilisé sur {host}. "
+                     "Omettez --port pour prendre automatiquement le suivant libre.",
+    "cli_no_free_port": "Aucun port libre entre {start} et {end}. "
+                        "Libérez-en un, ou indiquez le vôtre avec --port.",
+    "cli_port_auto": "Le port {default} est occupé, écoute sur le port {port}.",
+    "cli_launch_failed": "Le serveur n'a pas pu démarrer : {error}",
 }
 
 #: Group labels, keyed by ``group_<key>``.

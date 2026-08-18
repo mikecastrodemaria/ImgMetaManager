@@ -203,7 +203,10 @@ Exit codes: `0` on success, `1` when a file failed, `2` when no file was found.
 The application runs on your machine. No image leaves the computer and no
 network call is made to analyse a file.
 
-The server listens on `127.0.0.1` by default. `--share` creates a temporary
+The server listens on `127.0.0.1:7860` by default. When that port is taken, by
+another Gradio app such as a Stable Diffusion WebUI, the next free port is used
+and the terminal says which one. An explicit `--port` is honoured as given, so a
+clash there is reported as an error rather than moved somewhere unexpected. `--share` creates a temporary
 public link through Gradio and then disables local folder access and overwriting
 originals. Use `--host 0.0.0.0` to expose the application on your local network,
 knowingly.

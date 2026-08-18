@@ -7,6 +7,8 @@ process files straight from a terminal or a script.
 from __future__ import annotations
 
 import argparse
+import os
+import socket
 import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -20,6 +22,67 @@ from .core.writer import DEFAULT_KINDS, plan_removal, strip_metadata
 from .i18n import detect_language, group_label, set_language, t
 
 DEFAULT_PORT = 7860
+
+#: How many ports to try after the default one before giving up.
+PORT_SCAN_RANGE = 64
+
+
+# ------------------------------------------------------------------------ ports
+def port_is_free(host: str, port: int) -> bool:
+    """Tell whether the server could bind this TCP port on this host.
+
+    The probe mirrors what uvicorn does, so that its answer matches what the
+    real bind will do:
+
+    - On Unix, uvicorn sets ``SO_REUSEADDR``, which lets it reuse a port still
+      holding connections in ``TIME_WAIT``. Without the option here, restarting
+      the application right after closing a browser tab would needlessly move it
+      to the next port.
+    - On Windows, ``SO_REUSEADDR`` means something else entirely: it allows
+      binding a port another process actively holds. Setting it there would make
+      every check succeed, so the option stays off.
+    """
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as probe:
+        if os.name != "nt":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def find_free_port(host: str, start: int = DEFAULT_PORT,
+                   attempts: int = PORT_SCAN_RANGE) -> Optional[int]:
+    """Return the first free port at or after ``start``, or ``None`` if none is."""
+    for port in range(start, start + attempts):
+        if port_is_free(host, port):
+            return port
+    return None
+
+
+def resolve_port(host: str, requested: Optional[int]) -> Optional[int]:
+    """Pick the port to listen on, reporting the reason when none works.
+
+    An explicit ``--port`` is honoured as given: if it is busy, the caller hears
+    about it instead of silently landing somewhere else. Without one, the
+    default port is used when free and the next free port otherwise, which keeps
+    the application usable next to another Gradio app.
+    """
+    if requested is not None:
+        if port_is_free(host, requested):
+            return requested
+        print(t("cli_port_busy", port=requested, host=host), file=sys.stderr)
+        return None
+    port = find_free_port(host)
+    if port is None:
+        print(t("cli_no_free_port", start=DEFAULT_PORT,
+                end=DEFAULT_PORT + PORT_SCAN_RANGE - 1), file=sys.stderr)
+        return None
+    if port != DEFAULT_PORT:
+        print(t("cli_port_auto", default=DEFAULT_PORT, port=port))
+    return port
 
 
 # ------------------------------------------------------------------- file input
@@ -58,22 +121,31 @@ def cmd_ui(args: argparse.Namespace) -> int:
     from . import gr_compat as gc
     from .app import WORK_DIR, build_interface
 
+    port = resolve_port(args.host, args.port)
+    if port is None:
+        return 1
+
     allow_local = not args.share and not args.no_local
     roots = [WORK_DIR]
     if allow_local:
         roots.append(Path.home())
     demo = build_interface(allow_local=allow_local, allowed_roots=roots)
     _, launch_style = gc.place_style(theme=gr.themes.Soft())
-    demo.launch(
-        server_name=args.host,
-        server_port=args.port,
-        share=args.share,
-        inbrowser=not args.no_browser,
-        show_error=True,
-        allowed_paths=[str(root) for root in roots],
-        quiet=args.quiet,
-        **launch_style,
-    )
+    try:
+        demo.launch(
+            server_name=args.host,
+            server_port=port,
+            share=args.share,
+            inbrowser=not args.no_browser,
+            show_error=True,
+            allowed_paths=[str(root) for root in roots],
+            quiet=args.quiet,
+            **launch_style,
+        )
+    except OSError as exc:
+        # The port can be taken between the probe and the actual bind.
+        print(t("cli_launch_failed", error=exc), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -166,7 +238,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ui = subparsers.add_parser("ui", help="start the web interface (the default action)")
     ui.add_argument("--host", default="127.0.0.1", help="network interface to listen on")
-    ui.add_argument("--port", type=int, default=DEFAULT_PORT, help="port to listen on")
+    ui.add_argument("--port", type=int, default=None,
+                    help=f"port to listen on (default: {DEFAULT_PORT}, "
+                         "or the next free one)")
     ui.add_argument("--share", action="store_true",
                     help="create a temporary public link (disables local folder access)")
     ui.add_argument("--no-browser", action="store_true", help="do not open a browser")

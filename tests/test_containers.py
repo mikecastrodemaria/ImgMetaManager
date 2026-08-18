@@ -74,3 +74,15 @@ def test_language_detection(monkeypatch, value: str, expected: str):
         monkeypatch.delenv(variable, raising=False)
     monkeypatch.setenv("LANG", value)
     assert detect_language() == expected
+
+
+def test_declared_versions_agree():
+    """pyproject.toml and __init__.py must not drift apart."""
+    import pathlib
+    import tomllib
+
+    import imgmetamanager
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    assert imgmetamanager.__version__ == declared

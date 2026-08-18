@@ -11,6 +11,17 @@ and sdist, so `pip install` works straight from the downloaded file.
 
 Nothing yet.
 
+## [1.0.1] - 2026-08-18
+
+### Fixed
+
+- The interface refused to start when port 7860 was already taken, which is the
+  normal state of a machine running a Stable Diffusion WebUI or ComfyUI. Without
+  an explicit `--port`, the next free port is now used and the terminal says
+  which one. An explicit `--port` stays honoured as given: a clash there is
+  reported as a clear error instead of a traceback, and the launch no longer
+  crashes if the port disappears between the check and the bind.
+
 ## [1.0.0] - 2026-08-18
 
 First public release.
@@ -47,5 +58,6 @@ First public release.
 - Structural TIFF tags are never removed.
 - Overwriting an original requires an explicit confirmation and writes a backup.
 
-[Unreleased]: https://github.com/mikecastrodemaria/ImgMetaManager/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mikecastrodemaria/ImgMetaManager/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.0.1
 [1.0.0]: https://github.com/mikecastrodemaria/ImgMetaManager/releases/tag/v1.0.0
