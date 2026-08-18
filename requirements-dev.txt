@@ -1,0 +1,4 @@
+-r requirements.txt
+pillow-heif>=0.16
+pytest>=7.0
+pyflakes>=3.0

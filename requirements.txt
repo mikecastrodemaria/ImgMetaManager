@@ -1,0 +1,8 @@
+# ImgMetaManager runtime dependencies
+gradio>=5.0,<7.0
+pillow>=10.0
+piexif>=1.1.3
+defusedxml>=0.7.1
+
+# Optional: read HEIC/HEIF and AVIF files (iPhone photos)
+# pip install pillow-heif
